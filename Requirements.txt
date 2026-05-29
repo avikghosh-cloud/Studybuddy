@@ -1,0 +1,11 @@
+streamlit
+
+openai
+
+arxiv
+
+duckduckgo-search
+
+beautifulsoup4
+
+requests
