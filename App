@@ -1,0 +1,270 @@
+import os
+import requests
+import arxiv
+from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
+from openai import OpenAI
+
+# =========================
+# OPENAI CLIENT
+# =========================
+
+client = OpenAI(
+    api_key="sk-proj-TLWIktRX-tNhDvjp0MbmtVQ1q7yKgKr3COpTL3c7xWGhiaXI8PtrFFVeSGud0r90NeDMHwUACRT3BlbkFJ_dZlhQf_i7Zb5Bgq7ZZgyiAbGlaVqLqihjzbbbgcWZ9Nik82IJu6h1foWbtrvzWoekCyO5BEIAsk-proj-TLWIktRX-tNhDvjp0MbmtVQ1q7yKgKr3COpTL3c7xWGhiaXI8PtrFFVeSGud0r90NeDMHwUACRT3BlbkFJ_dZlhQf_i7Zb5Bgq7ZZgyiAbGlaVqLqihjzbbbgcWZ9Nik82IJu6h1foWbtrvzWoekCyO5BEIA"
+)
+
+# =========================
+# AI STUDY BUDDY CLASS
+# =========================
+
+class AIStudyBuddy:
+
+    def __init__(self):
+        print("\n📚 AI Study Buddy Initialized!\n")
+
+    # -------------------------
+    # SEARCH RESEARCH PAPERS
+    # -------------------------
+
+    def search_research_papers(self, topic, max_results=5):
+
+        print(f"\n🔎 Searching research papers for: {topic}\n")
+
+        search = arxiv.Search(
+            query=topic,
+            max_results=max_results,
+            sort_by=arxiv.SortCriterion.Relevance
+        )
+
+        papers = []
+
+        for result in search.results():
+
+            paper = {
+                "title": result.title,
+                "authors": [a.name for a in result.authors],
+                "summary": result.summary,
+                "pdf_url": result.pdf_url,
+                "published": result.published.strftime("%Y-%m-%d")
+            }
+
+            papers.append(paper)
+
+        return papers
+
+    # -------------------------
+    # SEARCH WEB ARTICLES
+    # -------------------------
+
+    def search_articles(self, topic, max_results=5):
+
+        print(f"\n🌐 Searching articles for: {topic}\n")
+
+        articles = []
+
+        with DDGS() as ddgs:
+
+            results = ddgs.text(
+                keywords=topic,
+                max_results=max_results
+            )
+
+            for r in results:
+
+                articles.append({
+                    "title": r.get("title"),
+                    "url": r.get("href"),
+                    "snippet": r.get("body")
+                })
+
+        return articles
+
+    # -------------------------
+    # SCRAPE ARTICLE CONTENT
+    # -------------------------
+
+    def scrape_article(self, url):
+
+        try:
+
+            headers = {
+                "User-Agent": "Mozilla/5.0"
+            }
+
+            response = requests.get(url, headers=headers, timeout=10)
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            paragraphs = soup.find_all("p")
+
+            content = " ".join([p.get_text() for p in paragraphs])
+
+            return content[:5000]
+
+        except Exception as e:
+            return f"Error scraping article: {e}"
+
+    # -------------------------
+    # AI SUMMARIZATION
+    # -------------------------
+
+    def summarize_text(self, text):
+
+        print("\n🧠 Generating AI summary...\n")
+
+        prompt = f"""
+        Summarize the following study material clearly for a student.
+
+        TEXT:
+        {text}
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an expert AI tutor."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.4
+        )
+
+        return response.choices[0].message.content
+
+    # -------------------------
+    # ASK STUDY QUESTION
+    # -------------------------
+
+    def ask_question(self, question):
+
+        print("\n🤖 Thinking...\n")
+
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+                    You are an intelligent study assistant.
+                    Explain topics clearly and simply.
+                    Use examples when helpful.
+                    """
+                },
+                {
+                    "role": "user",
+                    "content": question
+                }
+            ],
+            temperature=0.5
+        )
+
+        return response.choices[0].message.content
+
+# =========================
+# TERMINAL UI
+# =========================
+
+def main():
+
+    buddy = AIStudyBuddy()
+
+    while True:
+
+        print("\n========== AI STUDY BUDDY ==========")
+        print("1. Ask a study question")
+        print("2. Search research papers")
+        print("3. Search web articles")
+        print("4. Summarize article from URL")
+        print("5. Exit")
+
+        choice = input("\nChoose an option: ")
+
+        # ---------------------
+        # ASK QUESTION
+        # ---------------------
+
+        if choice == "1":
+
+            question = input("\nEnter your question: ")
+
+            answer = buddy.ask_question(question)
+
+            print("\n📘 ANSWER:\n")
+            print(answer)
+
+        # ---------------------
+        # RESEARCH PAPERS
+        # ---------------------
+
+        elif choice == "2":
+
+            topic = input("\nEnter research topic: ")
+
+            papers = buddy.search_research_papers(topic)
+
+            print("\n📄 RESEARCH PAPERS:\n")
+
+            for i, p in enumerate(papers, 1):
+
+                print(f"\n{i}. {p['title']}")
+                print(f"Authors: {', '.join(p['authors'])}")
+                print(f"Published: {p['published']}")
+                print(f"PDF: {p['pdf_url']}")
+                print(f"Summary: {p['summary'][:400]}...")
+
+        # ---------------------
+        # WEB ARTICLES
+        # ---------------------
+
+        elif choice == "3":
+
+            topic = input("\nEnter topic: ")
+
+            articles = buddy.search_articles(topic)
+
+            print("\n📰 ARTICLES:\n")
+
+            for i, a in enumerate(articles, 1):
+
+                print(f"\n{i}. {a['title']}")
+                print(f"URL: {a['url']}")
+                print(f"Snippet: {a['snippet']}")
+
+        # ---------------------
+        # SUMMARIZE URL
+        # ---------------------
+
+        elif choice == "4":
+
+            url = input("\nEnter article URL: ")
+
+            text = buddy.scrape_article(url)
+
+            summary = buddy.summarize_text(text)
+
+            print("\n🧠 SUMMARY:\n")
+            print(summary)
+
+        # ---------------------
+        # EXIT
+        # ---------------------
+
+        elif choice == "5":
+
+            print("\n👋 Goodbye!")
+            break
+
+        else:
+            print("\n❌ Invalid option.")
+
+# =========================
+# RUN PROGRAM
+# =========================
+
+if __name__ == "__main__":
+    main()
